@@ -83,8 +83,6 @@ FROM customer_purchases
 WHERE market_date < '2022-04-29'
 ORDER by customer_id, product_id, market_date;
 
--- I had a hard time with this one.
-
 --END QUERY
 
 
@@ -117,8 +115,6 @@ SELECT *
 FROM product
 WHERE product_size REGEXP '\d'
 ORDER BY product_id;
-
--- I <3 Regex
 
 --END QUERY
 
@@ -164,14 +160,19 @@ How many customers are there (y).
 Before your final group by you should have the product of those two queries (x*y).  */
 --QUERY 8
 
-SELECT DISTINCT vendor_id
-, SUM(original_price ) OVER(PARTITION BY vendor_id) as 'Maximum sales'
-FROM vendor_inventory
-CROSS JOIN customer;
+WITH product_profit AS (SELECT DISTINCT v.vendor_name, p.product_name, vi.original_price * 5 as 'profit_per_product'
+FROM vendor v
+JOIN vendor_inventory vi
+	ON v.vendor_id = vi.vendor_id
+JOIN product p
+	ON p.product_id = vi.product_id)
+	
+SELECT DISTINCT vendor_name, product_name, SUM(profit_per_product) OVER (PARTITION BY product_name) as 'total_profit'
+FROM product_profit
+CROSS JOIN customer
+ORDER BY vendor_name, product_name, total_profit;
 
-SELECT DISTINCT vendor_id from vendor_inventory;
-
-SELECT * frmo vendor_inventory
+-- I didn't like this one.  My instincts were to just use COUNT instead of CROSS JOIN?
 
 --END QUERY
 
@@ -202,7 +203,6 @@ This can be any product you desire (e.g. add another record for Apple Pie). */
 
 INSERT INTO product_units
 VALUES (7,'Apple Pie','10"','3','unit',CURRENT_TIMESTAMP);
-
 
 
 SELECT * FROM product_units;
@@ -258,6 +258,43 @@ When you have all of these components, you can run the update statement. */
 ALTER TABLE product_units
 ADD current_quantity INT;
 
+SELECT * FROM product_units;
+
+
+--SELECT * 
+--FROM last_quantity;
+
+--Update statement
+UPDATE product_units
+SET current_quantity = (
+	
+	--Declare CTE to get the most recent date with DENSE_RANK() though RANK() would work too.
+	WITH latest_quantity AS (
+	SELECT market_date
+		,coalesce(quantity,0) as 'quantity' -- This makes the nulls into zeroes
+		,p.product_id
+		,product_name
+		,DENSE_RANK() OVER(PARTITION BY vi.product_id ORDER BY vi.market_date DESC) as 'market_date_rank'
+	FROM vendor_inventory vi
+	FULL JOIN product p -- FULL JOIN to gets the products without current inventory
+		ON vi.product_id = p.product_id
+	ORDER BY market_date DESC
+	)
+	
+	-- Second CTE to select the result of the DENSE_RANK() window function
+	,last_quantity AS (
+		SELECT product_name,product_id, quantity
+		FROM latest_quantity
+		WHERE market_date_rank = 1
+		)
+	
+	-- The final match between last_quantity.product_id and product_units,product_id.
+	SELECT quantity
+	FROM last_quantity
+	WHERE last_quantity.product_id = product_units.product_id);
+	
+SELECT * FROM product_units;
+-- This one was a doozy.  
 
 
 --END QUERY
