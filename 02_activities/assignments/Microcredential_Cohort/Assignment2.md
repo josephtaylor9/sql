@@ -56,7 +56,8 @@ The store wants to keep customer addresses. Propose two architectures for the CU
 **HINT:** search type 1 vs type 2 slowly changing dimensions. 
 
 ```
-Your answer...
+Type 1 will overwrite previous value, does not retain history.
+Type 2 inserts a new record and the old records are retained.
 ```
 
 ***
